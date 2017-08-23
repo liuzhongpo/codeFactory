@@ -1,0 +1,127 @@
+<#include "/macro.include"/>
+<#assign className = table.className>   
+<#assign classNameFirstLower = table.classNameFirstLower>   
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<#macro mapperEl value>${r"#{"}${value}}</#macro>
+<#macro namespace>${className}.</#macro>
+<mapper namespace="${basepackage}.mapper.${className}Mapper">
+
+	<!-- 用于select查询公用抽取的列 -->
+	<sql id="${className}_columns">
+	    <![CDATA[
+		<#list table.columns as column>${column.sqlName}<#if column_has_next>,</#if></#list>
+	    ]]>
+	</sql>
+
+    <select id="selectByExample" resultType="${basepackage}.entity.${className}" parameterType="${basepackage}.entity.${className}Example" >
+    select
+    <if test="distinct" >
+        distinct
+    </if>
+    <include refid="${className}_columns" />
+    from ${table.sqlName}
+    <if test="_parameter != null" >
+        <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null" >
+        order ${r"by ${orderByClause}"}
+    </if>
+    </select>
+
+	<!-- useGeneratedKeys="true"(主键自增)  keyProperty="xxx" for sqlserver and mysql -->
+	<insert id="insert" useGeneratedKeys="true" keyProperty="${table.idColumn.columnNameFirstLower}" parameterType="${basepackage}.entity.${className}">
+        <![CDATA[
+        INSERT INTO ${table.sqlName} (
+        <#list table.columns as column> ${column.sqlName}<#if column_has_next>,</#if></#list>
+        ) VALUES (
+        <#list table.columns as column> <@mapperEl column.columnNameFirstLower/><#if column_has_next>,</#if></#list>        
+        )
+    ]]>
+	</insert>
+    
+	<update id="update" parameterType="${basepackage}.entity.${className}">
+        UPDATE ${table.sqlName}
+        <set >
+	        <#list table.notPkColumns as column>
+                  ${column.sqlName} = <@mapperEl column.columnNameFirstLower/> <#if column_has_next>,</#if>
+	        </#list>
+	    </set>
+        WHERE 
+        	<#list table.compositeIdColumns as column>${column.sqlName} = <@mapperEl column.columnNameLower/> <#if column_has_next> AND </#if> </#list>	        
+	</update>
+
+    <update id="updateNotNull" parameterType="${basepackage}.entity.${className}">
+        UPDATE ${table.sqlName}
+        <set >
+            <#list table.notPkColumns as column>
+            <if test="${column.columnNameFirstLower} != null" >
+                ${column.sqlName} = <@mapperEl column.columnNameFirstLower/> <#if column_has_next>,</#if>
+        </if>
+        </#list>
+                </set>
+                WHERE
+        <#list table.compositeIdColumns as column>${column.sqlName} = <@mapperEl column.columnNameLower/> <#if column_has_next> AND </#if> </#list>
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Long">
+            DELETE FROM ${table.sqlName} WHERE
+            <#list table.compositeIdColumns as column>
+            ${column.sqlName} = <@mapperEl 'id'/>
+        </#list>
+    </delete>
+
+    <delete id="delete" parameterType="${basepackage}.entity.${className}">
+    <![CDATA[
+        DELETE FROM ${table.sqlName} WHERE
+        <#list table.compositeIdColumns as column>
+        ${column.sqlName} = <@mapperEl 'id'/> <#if column_has_next> AND </#if>
+		</#list>
+    ]]>
+    </delete>
+    
+    <select id="findById" resultType="${basepackage}.entity.${className}" parameterType="java.lang.Long" >
+		SELECT <include refid="${className}_columns" />
+	    <![CDATA[
+		    FROM ${table.sqlName} 
+	        WHERE 
+				<#list table.compositeIdColumns as column>
+		        ${column.sqlName} = <@mapperEl 'id'/> <#if column_has_next> AND </#if>
+		        </#list>    
+	    ]]>
+	</select>
+
+    <sql id="Example_Where_Clause" >
+    <where >
+        <foreach collection="oredCriteria" item="criteria" separator="or" >
+            <if test="criteria.valid" >
+                <trim prefix="(" suffix=")" prefixOverrides="and" >
+                    <foreach collection="criteria.criteria" item="criterion" >
+                        <choose >
+                            <when test="criterion.noValue" >
+                                and ${r"${criterion.condition}"}
+                            </when>
+                            <when test="criterion.singleValue" >
+                                and ${r"${criterion.condition}"} ${r"#{criterion.value}"}
+                            </when>
+                            <when test="criterion.betweenValue" >
+                                and ${r"${criterion.condition}"} ${r"#{criterion.value}"} and ${r"#{criterion.secondValue}"}
+                            </when>
+                            <when test="criterion.listValue" >
+                                and ${r"${criterion.condition}"}
+                                <foreach collection="criterion.value" item="listItem" open="(" close=")" separator="," >
+                                    ${r"#{listItem}"}
+                                </foreach>
+                            </when>
+                        </choose>
+                    </foreach>
+                </trim>
+            </if>
+        </foreach>
+    </where>
+    </sql>
+
+</mapper>
+
